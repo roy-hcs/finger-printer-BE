@@ -95,11 +95,14 @@ router.post('/generate-registration-options', async (req, res) => {
       transports: auth.transports ? JSON.parse(auth.transports) : undefined,
     }));
     
+    // Convert userID to Uint8Array as required by SimpleWebAuthn
+    const userIdUint8Array = new TextEncoder().encode(userId.toString());
+    
     // Generate registration options
     const options = await generateRegistrationOptions({
       rpName: webAuthnConfig.rpName,
       rpID: webAuthnConfig.rpID,
-      userID: userId.toString(),
+      userID: userIdUint8Array, // Changed from string to Uint8Array
       userName: username,
       userDisplayName: username,
       attestationType: 'none',
@@ -207,10 +210,9 @@ router.post('/generate-authentication-options', async (req, res) => {
       transports: auth.transports ? JSON.parse(auth.transports) : undefined,
     }));
 
-    // Generate authentication options with Uint8Array userID
+    // Generate authentication options
     const options = await generateAuthenticationOptions({
       rpID: webAuthnConfig.rpID,
-      userID: userIdUint8Array, // Fixed: Use Uint8Array instead of string
       userVerification: 'preferred',
       allowCredentials,
     });
