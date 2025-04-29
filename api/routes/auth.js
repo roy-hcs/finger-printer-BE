@@ -182,39 +182,43 @@ router.post('/generate-authentication-options', async (req, res) => {
       return res.status(400).json({ error: 'Username is required' });
     }
     
-    // Get the user ID from username
+    // Get the user from the database
     const user = db.findUserByUsername(username);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
     
     const userId = user.id;
-    
-    // Get authenticators for this user
+
+    // Convert userID to Uint8Array to comply with SimpleWebAuthn requirements
+    const userIdUint8Array = new TextEncoder().encode(userId.toString());
+
+    // Retrieve authenticators for this user
     const authenticators = db.getAuthenticatorsByUserId(userId);
-    
+
     if (!authenticators.length) {
       return res.status(404).json({ error: 'No authenticators found for this user' });
     }
-    
-    // Map authenticators to the format expected by SimpleWebAuthn
+
+    // Map authenticators to allowCredentials format
     const allowCredentials = authenticators.map(auth => ({
       id: Buffer.from(auth.credentialId, 'base64url'),
       type: 'public-key',
       transports: auth.transports ? JSON.parse(auth.transports) : undefined,
     }));
-    
-    // Generate authentication options
+
+    // Generate authentication options with Uint8Array userID
     const options = await generateAuthenticationOptions({
       rpID: webAuthnConfig.rpID,
-      allowCredentials,
+      userID: userIdUint8Array, // Fixed: Use Uint8Array instead of string
       userVerification: 'preferred',
+      allowCredentials,
     });
-    
+
     // Store challenge in database for verification
     const expiryTime = Date.now() + 5 * 60 * 1000; // 5 minutes
     db.storeChallenge(userId, options.challenge, expiryTime);
-    
+
     res.json(options);
   } catch (error) {
     res.status(500).json({ error: error.message });
