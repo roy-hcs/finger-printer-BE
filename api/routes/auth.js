@@ -127,7 +127,7 @@ router.post('/generate-registration-options', async (req, res) => {
 // Verify WebAuthn registration
 router.post('/verify-registration', async (req, res) => {
   try {
-    const { userId, attestationResponse } = req.body;
+    const { userId, attestationResponse, origin } = req.body;
     
     if (!userId || !attestationResponse) {
       return res.status(400).json({ error: 'User ID and attestation response are required' });
@@ -142,10 +142,13 @@ router.post('/verify-registration', async (req, res) => {
     // Verify the registration response
     let verification;
     try {
+      // Use the allowed origins list instead of a single origin
+      // This allows verification of responses from both frontend and backend
       verification = await verifyRegistrationResponse({
         response: attestationResponse,
         expectedChallenge,
-        expectedOrigin: webAuthnConfig.origin,
+        // Use either the client-provided origin or check against all allowed origins
+        expectedOrigin: origin || webAuthnConfig.allowedOrigins,
         expectedRPID: webAuthnConfig.rpID,
         requireUserVerification: false,
       });
@@ -230,7 +233,7 @@ router.post('/generate-authentication-options', async (req, res) => {
 // Verify WebAuthn authentication
 router.post('/verify-authentication', async (req, res) => {
   try {
-    const { username, assertionResponse } = req.body;
+    const { username, assertionResponse, origin } = req.body;
     
     if (!username || !assertionResponse) {
       return res.status(400).json({ error: 'Username and assertion response are required' });
@@ -264,7 +267,8 @@ router.post('/verify-authentication', async (req, res) => {
       verification = await verifyAuthenticationResponse({
         response: assertionResponse,
         expectedChallenge,
-        expectedOrigin: webAuthnConfig.origin,
+        // Use either the client-provided origin or check against all allowed origins
+        expectedOrigin: origin || webAuthnConfig.allowedOrigins,
         expectedRPID: webAuthnConfig.rpID,
         authenticator: {
           credentialID: Buffer.from(authenticator.credentialId, 'base64url'),
