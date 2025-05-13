@@ -383,4 +383,9 @@ router.post('/verify-authentication', (req, res, next) => {
   }
 });
 
+// a simple health check endpoint
+router.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', message: 'API is running' });
+});
+
 module.exports = router;
