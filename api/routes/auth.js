@@ -7,6 +7,7 @@ const {
   generateAuthenticationOptions,
   verifyAuthenticationResponse
 } = require('@simplewebauthn/server');
+// const {fromBase64URL} = require('../../utils/webauthn.js') 
 
 // Use our in-memory database
 const db = require('../db');
@@ -404,6 +405,9 @@ router.post('/verify-authentication', async (req, res) => {
     // Add this to look at how we're storing the public key
     console.log('Raw public key from database:', authenticator.publicKey);
     
+    // Convert the publicKey from base64url string to Uint8Array
+    const publicKeyUint8Array = Buffer.from(authenticator.publicKey, 'base64url');
+    console.log('is Unit8Array:', publicKeyUint8Array instanceof Uint8Array);
     // For v13.1.1, try a different approach to fix the credential error
     try {
       // Log the client origin for debugging
@@ -416,16 +420,17 @@ router.post('/verify-authentication', async (req, res) => {
       const credential = {
         // These property names match what's expected by verifyAuthenticationResponse in v13.1.1
         id: authenticator.credentialId,
-        // For v13.1.1, publicKey should be used instead of credentialPublicKey
-        publicKey: authenticator.publicKey,
-        algorithm: 'ES256', // Default algorithm for WebAuthn
+        // Use the converted Uint8Array publicKey
+        publicKey: publicKeyUint8Array,
+        // algorithm: 'ES256', // Default algorithm for WebAuthn
         counter: Number(authenticator.counter || 0),
       };
       
       console.log('Using credential data for v13.1.1:', {
         id: credential.id.substring(0, 10) + '...',
         publicKeyLength: credential.publicKey.length,
-        algorithm: credential.algorithm,
+        isBuffer: Buffer.isBuffer(credential.publicKey),
+        // algorithm: credential.algorithm,
         counter: credential.counter
       });
       
