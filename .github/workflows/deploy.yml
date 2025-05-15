@@ -20,8 +20,17 @@ jobs:
           password: ${{ secrets.PASSWORD }}
           port: 22
           script: |
+            echo "Checking PM2 installation..."
+            which pm2 || echo "PM2 not found in PATH"
+            pm2 -v || echo "PM2 version command failed"
+            echo "Checking Node.js installation..."
+            which node || echo "Node.js not found in PATH"
+            node -v || echo "Node.js version command failed"
+            echo "Current working directory:"
+            pwd
             cd /var/www/finger-printer-BE
             git fetch origin
             git reset --hard origin/main
             npm install
             pm2 restart my-express-app || pm2 start app.js
+            echo "Deployment complete"
