@@ -20,7 +20,7 @@ jobs:
           password: ${{ secrets.PASSWORD }}
           port: 22
           script: |
-            cd /var/www/my-express-api
+            cd /var/www/finger-printer-BE
             git fetch origin
             git reset --hard origin/main
             npm install
