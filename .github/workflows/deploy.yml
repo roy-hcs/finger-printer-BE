@@ -20,6 +20,10 @@ jobs:
           password: ${{ secrets.PASSWORD }}
           port: 22
           script: |
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            nvm use 20.19.0
+            echo "Node version: $(node -v)"
             echo "Checking PM2 installation..."
             which pm2 || echo "PM2 not found in PATH"
             pm2 -v || echo "PM2 version command failed"
