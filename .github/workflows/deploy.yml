@@ -36,5 +36,5 @@ jobs:
             git fetch origin
             git reset --hard origin/main
             npm install
-            pm2 restart my-express-app || pm2 start app.js
+            pm2 restart app || pm2 start app.js
             echo "Deployment complete"
