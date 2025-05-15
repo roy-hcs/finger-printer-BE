@@ -20,7 +20,7 @@ jobs:
           password: ${{ secrets.PASSWORD }}
           port: 22
           script: |
-            cd /home/ubuntu/my-express-app
+            cd /var/www/my-express-api
             git fetch origin
             git reset --hard origin/main
             npm install
