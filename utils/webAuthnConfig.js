@@ -10,7 +10,9 @@ const webAuthnConfig = {
   // Include both your frontend and backend origins
   origin: [
     'https://roy-hcs.github.io',  // Frontend
-    'https://roy123.xyz'          // Backend
+    'https://roy123.xyz',          // Backend
+    'http://localhost:8080',      // Local development frontend
+    'http://localhost:3000'
   ],
   timeout: 60000
 };

@@ -171,10 +171,6 @@ router.post('/verify-registration', (req, res, next) => {
       return res.status(400).json({ error: 'User ID and attestation response are required' });
     }
 
-    // Add CORS headers for cross-origin requests
-    res.header('Access-Control-Allow-Origin', 'https://roy-hcs.github.io');
-    res.header('Access-Control-Allow-Credentials', 'true');
-
     // Get the challenge from the database
     db.get('SELECT challenge FROM challenges WHERE user_id = ? AND expires > ?', 
       [userId, Date.now()], 
@@ -195,8 +191,8 @@ router.post('/verify-registration', (req, res, next) => {
           verification = await verifyRegistrationResponse({
             response: attestationResponse,
             expectedChallenge,
-            expectedOrigin: ['https://roy-hcs.github.io', 'https://roy123.xyz'],
-            expectedRPID: 'roy123.xyz',
+            expectedOrigin: webAuthnConfig.origin,
+            expectedRPID: webAuthnConfig.rpID,
             requireUserVerification: false,
           });
         } catch (error) {
@@ -359,10 +355,6 @@ router.post('/verify-authentication', (req, res, next) => {
     
     console.log('Authentication response:', JSON.stringify(assertionResponse, null, 2));
     
-    // Add CORS headers
-    res.header('Access-Control-Allow-Origin', 'https://roy-hcs.github.io');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    
     // Get the user
     db.get('SELECT * FROM users WHERE username = ?', [username], (err, user) => {
       if (err) {
@@ -471,8 +463,8 @@ router.post('/verify-authentication', (req, res, next) => {
                 verification = await patchedVerify({
                   response: assertionResponse,
                   expectedChallenge,
-                  expectedOrigin: ['https://roy-hcs.github.io', 'https://roy123.xyz'],
-                  expectedRPID: 'roy123.xyz',
+                  expectedOrigin: webAuthnConfig.origin,
+                  expectedRPID: webAuthnConfig.rpID,
                   authenticator: authData,
                   requireUserVerification: false,
                 });
