@@ -34,7 +34,7 @@ jobs:
             pwd
             cd /var/www/finger-printer-BE
             echo "WEBAUTHN_ORIGIN=${{ secrets.WEBAUTHN_ORIGIN }}" > .env
-            echo "WEBAUTHN_RP_ID=${{ secrets.WEBAUTHN_RP_ID }}" > .env
+            echo "WEBAUTHN_RP_ID=${{ secrets.WEBAUTHN_RP_ID }}" >> .env
             git fetch origin
             git reset --hard origin/main
             npm install
