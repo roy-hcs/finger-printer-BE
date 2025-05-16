@@ -171,27 +171,9 @@ router.post('/verify-registration', (req, res, next) => {
       return res.status(400).json({ error: 'User ID and attestation response are required' });
     }
 
-    // Log client origin for debugging purposes
-    const clientOrigin = req.headers.origin || req.headers.referer || 'unknown';
-    console.log('Client request details:', {
-      clientOrigin,
-      host: req.headers.host,
-      fullUrl: `${req.protocol}://${req.headers.host}${req.originalUrl}`,
-      webAuthnOrigin: webAuthnConfig.origin,
-      webAuthnRpID: webAuthnConfig.rpID
-    });
-
-    // Handle the production domain case specifically
-    if (req.headers.host === 'roy123.xyz' || req.headers.host.endsWith('.roy123.xyz')) {
-      console.log('Production domain detected, enforcing proper WebAuthn configuration');
-      // Override configuration for production environment
-      webAuthnConfig.rpID = 'roy123.xyz';
-      if (typeof webAuthnConfig.origin === 'string') {
-        webAuthnConfig.origin = 'https://roy123.xyz';
-      } else {
-        webAuthnConfig.origin = ['https://roy123.xyz'];
-      }
-    }
+    // Add CORS headers for cross-origin requests
+    res.header('Access-Control-Allow-Origin', 'https://roy-hcs.github.io');
+    res.header('Access-Control-Allow-Credentials', 'true');
 
     // Get the challenge from the database
     db.get('SELECT challenge FROM challenges WHERE user_id = ? AND expires > ?', 
@@ -209,24 +191,25 @@ router.post('/verify-registration', (req, res, next) => {
         
         let verification;
         try {
-          console.log('Attempting verification with:', {
-            challenge: expectedChallenge,
-            origin: webAuthnConfig.origin,
-            rpID: webAuthnConfig.rpID
-          });
-
           // Use the original format sent by the client
           verification = await verifyRegistrationResponse({
             response: attestationResponse,
             expectedChallenge,
-            expectedOrigin: webAuthnConfig.origin,
-            expectedRPID: webAuthnConfig.rpID,
+            expectedOrigin: ['https://roy-hcs.github.io', 'https://roy123.xyz'],
+            expectedRPID: 'roy123.xyz',
             requireUserVerification: false,
           });
         } catch (error) {
-          return res.status(400).json({ 
-            error: error.message
-          });
+          // Special handling for RP ID validation errors
+          if (error.message && error.message.includes('RP ID')) {
+            console.error('WebAuthn RP ID validation error:', error.message);
+            return res.status(400).json({ 
+              error: 'Domain validation failed. Please ensure you are using the correct domain.',
+              details: 'The domain you\'re accessing from doesn\'t match the RP ID configuration.'
+            });
+          }
+          
+          return res.status(400).json({ error: error.message });
         }
         
         const { verified, registrationInfo } = verification;
@@ -376,6 +359,10 @@ router.post('/verify-authentication', (req, res, next) => {
     
     console.log('Authentication response:', JSON.stringify(assertionResponse, null, 2));
     
+    // Add CORS headers
+    res.header('Access-Control-Allow-Origin', 'https://roy-hcs.github.io');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
     // Get the user
     db.get('SELECT * FROM users WHERE username = ?', [username], (err, user) => {
       if (err) {
@@ -484,8 +471,8 @@ router.post('/verify-authentication', (req, res, next) => {
                 verification = await patchedVerify({
                   response: assertionResponse,
                   expectedChallenge,
-                  expectedOrigin: webAuthnConfig.origin,
-                  expectedRPID: webAuthnConfig.rpID,
+                  expectedOrigin: ['https://roy-hcs.github.io', 'https://roy123.xyz'],
+                  expectedRPID: 'roy123.xyz',
                   authenticator: authData,
                   requireUserVerification: false,
                 });
