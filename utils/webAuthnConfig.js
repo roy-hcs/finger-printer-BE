@@ -13,8 +13,8 @@ const webAuthnConfig = {
   
   // Origin of your application - should match your domain
   // For localhost development: 'http://localhost:3000' (include protocol and port)
-  // origin: process.env.WEBAUTHN_ORIGIN || ['http://localhost:3000', 'http://localhost:8080'],
-  origin: ['http://localhost:3000', 'http://localhost:8080'],
+  origin: process.env.WEBAUTHN_ORIGIN || ['http://localhost:3000', 'http://localhost:8080'],
+  // origin: ['http://localhost:3000', 'http://localhost:8080'],
   
   // Timeout for the WebAuthn operations (in ms)
   timeout: 60000
