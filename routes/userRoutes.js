@@ -171,26 +171,26 @@ router.post('/verify-registration', (req, res, next) => {
       return res.status(400).json({ error: 'User ID and attestation response are required' });
     }
 
-    console.log('Full attestation response:', JSON.stringify(attestationResponse, null, 2));
-
-    // SimpleWebAuthn expects specific format for credential data
-    // Clone the attestation response to avoid modifying the original
-    const verificationInput = JSON.parse(JSON.stringify(attestationResponse));
-    
-    // For debugging
-    console.log('Original credential format:', {
-      id: attestationResponse.id,
-      rawId: attestationResponse.rawId
+    // Log client origin for debugging purposes
+    const clientOrigin = req.headers.origin || req.headers.referer || 'unknown';
+    console.log('Client request details:', {
+      clientOrigin,
+      host: req.headers.host,
+      fullUrl: `${req.protocol}://${req.headers.host}${req.originalUrl}`,
+      webAuthnOrigin: webAuthnConfig.origin,
+      webAuthnRpID: webAuthnConfig.rpID
     });
-    
-    // Convert the base64url-encoded strings to ArrayBuffer
-    try {
-      // Using the raw credential format without Buffer conversion
-      // SimpleWebAuthn will handle the base64url conversion internally
-      console.log('Using raw credential format for verification');
-    } catch (error) {
-      console.error('Error preparing credential format:', error);
-      return res.status(400).json({ error: 'Invalid credential format' });
+
+    // Handle the production domain case specifically
+    if (req.headers.host === 'roy123.xyz' || req.headers.host.endsWith('.roy123.xyz')) {
+      console.log('Production domain detected, enforcing proper WebAuthn configuration');
+      // Override configuration for production environment
+      webAuthnConfig.rpID = 'roy123.xyz';
+      if (typeof webAuthnConfig.origin === 'string') {
+        webAuthnConfig.origin = 'https://roy123.xyz';
+      } else {
+        webAuthnConfig.origin = ['https://roy123.xyz'];
+      }
     }
 
     // Get the challenge from the database
@@ -207,9 +207,7 @@ router.post('/verify-registration', (req, res, next) => {
         
         const expectedChallenge = row.challenge;
         
-        // Verify the registration response
         let verification;
-        console.log(webAuthnConfig.origin, 'origin config---')
         try {
           console.log('Attempting verification with:', {
             challenge: expectedChallenge,
@@ -219,24 +217,15 @@ router.post('/verify-registration', (req, res, next) => {
 
           // Use the original format sent by the client
           verification = await verifyRegistrationResponse({
-            response: attestationResponse, // Use original response from client
+            response: attestationResponse,
             expectedChallenge,
             expectedOrigin: webAuthnConfig.origin,
             expectedRPID: webAuthnConfig.rpID,
             requireUserVerification: false,
           });
-          
-          // Log the verification result for debugging
-          console.log('Verification result:', {
-            verified: verification.verified,
-            hasRegInfo: !!verification.registrationInfo,
-            regInfoKeys: verification.registrationInfo ? Object.keys(verification.registrationInfo) : []
-          });
         } catch (error) {
-          console.error('Verification error details:', error);
           return res.status(400).json({ 
-            error: error.message,
-            details: error.stack
+            error: error.message
           });
         }
         
@@ -246,52 +235,28 @@ router.post('/verify-registration', (req, res, next) => {
           return res.status(400).json({ error: 'Registration verification failed' });
         }
         
-        // Log registration info structure in detail
-        console.log('Full registration info keys:', Object.keys(registrationInfo));
-        console.log('Credential property details:', registrationInfo.credential ? Object.keys(registrationInfo.credential) : 'No credential property');
-        
-        // Extract credential data from the new structure
         let credentialID, credentialPublicKey, counter;
 
         if (registrationInfo.credential) {
-          // New structure
           credentialID = registrationInfo.credential.id;
           credentialPublicKey = registrationInfo.credential.publicKey;
           counter = registrationInfo.credential.counter || 0;
-          
-          console.log('Using credential property structure');
-          console.log('Credential ID type:', typeof credentialID);
-          console.log('Credential public key type:', typeof credentialPublicKey);
         } else {
-          // Fall back to legacy structure if available
           credentialID = registrationInfo.credentialID;
           credentialPublicKey = registrationInfo.credentialPublicKey;
           counter = registrationInfo.counter || 0;
-          
-          console.log('Using legacy structure');
         }
         
-        // Safety check for credential data before Buffer conversion
-        if (!credentialID) {
-          console.error('Missing credentialID in registrationInfo:', registrationInfo);
-          return res.status(500).json({ error: 'Invalid credential ID returned from verification' });
+        if (!credentialID || !credentialPublicKey) {
+          return res.status(500).json({ error: 'Invalid credential data returned from verification' });
         }
         
-        if (!credentialPublicKey) {
-          console.error('Missing credentialPublicKey in registrationInfo:', registrationInfo);
-          return res.status(500).json({ error: 'Invalid credential public key returned from verification' });
-        }
-        
-        // Convert credential data to base64url safely
         let credentialIDBase64, credentialPublicKeyBase64;
         
         try {
-          // Handle string credentials - they're already in base64url format
           if (typeof credentialID === 'string') {
             credentialIDBase64 = credentialID;
-          } 
-          // Handle different formats - Uint8Array, ArrayBuffer, or Buffer
-          else if (credentialID instanceof Uint8Array || credentialID instanceof ArrayBuffer) {
+          } else if (credentialID instanceof Uint8Array || credentialID instanceof ArrayBuffer) {
             credentialIDBase64 = Buffer.from(credentialID).toString('base64url');
           } else if (Buffer.isBuffer(credentialID)) {
             credentialIDBase64 = credentialID.toString('base64url');
@@ -299,23 +264,16 @@ router.post('/verify-registration', (req, res, next) => {
             throw new Error(`Unexpected credentialID type: ${typeof credentialID}`);
           }
           
-          // Handle string public keys - they're already in the format we need
           if (typeof credentialPublicKey === 'string') {
             credentialPublicKeyBase64 = credentialPublicKey;
-          }
-          // Handle different formats - Uint8Array, ArrayBuffer, or Buffer
-          else if (credentialPublicKey instanceof Uint8Array || credentialPublicKey instanceof ArrayBuffer) {
+          } else if (credentialPublicKey instanceof Uint8Array || credentialPublicKey instanceof ArrayBuffer) {
             credentialPublicKeyBase64 = Buffer.from(credentialPublicKey).toString('base64url');
           } else if (Buffer.isBuffer(credentialPublicKey)) {
             credentialPublicKeyBase64 = credentialPublicKey.toString('base64url');
           } else {
             throw new Error(`Unexpected credentialPublicKey type: ${typeof credentialPublicKey}`);
           }
-          
-          console.log('Credential ID Base64:', credentialIDBase64);
-          console.log('Credential Public Key Base64:', credentialPublicKeyBase64 ? `${credentialPublicKeyBase64.substring(0, 20)}...` : 'undefined');
         } catch (error) {
-          console.error('Error converting credential data:', error);
           return res.status(500).json({ error: 'Failed to process credential data' });
         }
         
@@ -327,7 +285,6 @@ router.post('/verify-registration', (req, res, next) => {
               return next(err);
             }
             
-            // Clean up the challenge
             db.run('DELETE FROM challenges WHERE user_id = ?', [userId]);
             
             return res.json({ verified: true });
